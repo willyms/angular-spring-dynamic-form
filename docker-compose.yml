@@ -1,0 +1,57 @@
+version: '3.1'
+services:
+  mongodb-app:
+    image: "mongo:latest"
+    container_name: mongodb-app
+    env_file:
+      - .env
+    environment:
+      - MONGO_INITDB_DATABASE=${MONGO_ROOT_DATABASE}
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASS}
+      - MONGO_INITDB_DATABASE=${MONGO_DATABASE}
+    ports:
+      - 27017:27017
+    volumes:
+      - ./init-mongo.js:/docker-entrypoint-initdb.d/init-mongo-js:ro
+      - mongodb_data_container:/data/db
+    healthcheck:
+      test: "mongo --eval 'db.stats().ok'"
+      interval: 20s
+      timeout: 5s
+      retries: 10
+  mongo-express-app:
+    image: "mongo-express:latest"
+    container_name: mongo-express-app
+    env_file:
+      - .env
+    restart: always
+    depends_on:
+      - mongodb-app
+    ports:
+      - 8081:8081
+    environment:
+      ME_CONFIG_MONGODB_SERVER: mongodb-app
+      ME_CONFIG_BASICAUTH_USERNAME: ${MONGOEXPRESS_LOGIN}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${MONGOEXPRESS_PASS}
+      ME_CONFIG_MONGODB_PORT: 27017
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGO_ROOT_USER}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGO_ROOT_PASS}
+  backend-app:
+    build: ./backend
+    container_name: backend-app
+    env_file:
+      - .env
+    depends_on:
+      mongodb-app:
+        condition: service_healthy
+    environment:
+      - DB_SERVER=mongodb-app
+      - MONGO_DB=${MONGO_DATABASE}
+      - MONGO_USER=${MONGO_ROOT_USER}
+      - MONGO_PASSWORD=${MONGO_ROOT_PASS}
+    ports:
+      - 8080:8080
+volumes:
+  mongodb_data_container:
+    
